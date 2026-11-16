@@ -2,6 +2,7 @@
 
 import { Activity, useCallback, useEffect, useRef, useState } from 'react'
 import { BottomNav } from './bottom-nav'
+import { DesktopNav } from './desktop-nav'
 import { HomeScreen } from './home-screen'
 import { CycleScreen } from './cycle-screen'
 import { SupportScreen, type SupportView } from './support-screen'
@@ -18,7 +19,8 @@ export function AppShell() {
   const [sosOpen, setSosOpen] = useState(false)
   const [onboarding, setOnboarding] = useState(false)
   const [request, setRequest] = useState<PadRequest | null>(null)
-  const scrollRef = useRef<HTMLElement>(null)
+  const mobileScrollRef = useRef<HTMLElement>(null)
+  const desktopScrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (request?.status !== 'pending') return
@@ -31,7 +33,8 @@ export function AppShell() {
   const navigate = (next: TabId, view?: SupportView) => {
     if (view) setSupportView(view)
     setTab(next)
-    scrollRef.current?.scrollTo({ top: 0 })
+    mobileScrollRef.current?.scrollTo({ top: 0 })
+    desktopScrollRef.current?.scrollTo({ top: 0 })
   }
 
   const closeSos = useCallback(() => setSosOpen(false), [])
@@ -44,50 +47,34 @@ export function AppShell() {
     onDismissRequest: () => setRequest(null),
   }
 
+  const screenContent = (
+    <>
+      <Activity mode={tab === 'home' ? 'visible' : 'hidden'}>
+        <HomeScreen onNavigate={navigate} {...requestHandlers} />
+      </Activity>
+      <Activity mode={tab === 'cycle' ? 'visible' : 'hidden'}>
+        <CycleScreen />
+      </Activity>
+      <Activity mode={tab === 'support' ? 'visible' : 'hidden'}>
+        <SupportScreen view={supportView} onViewChange={setSupportView} {...requestHandlers} />
+      </Activity>
+      <Activity mode={tab === 'assistant' ? 'visible' : 'hidden'}>
+        <AssistantScreen />
+      </Activity>
+      <Activity mode={tab === 'profile' ? 'visible' : 'hidden'}>
+        <ProfileScreen onReplayOnboarding={() => setOnboarding(true)} />
+      </Activity>
+    </>
+  )
+
   return (
-    <div className="flex min-h-dvh justify-center bg-[radial-gradient(ellipse_at_top,#efedf6,transparent_60%),radial-gradient(ellipse_at_bottom_right,#f7e9eb,transparent_55%)] lg:items-center lg:gap-16 lg:p-10">
-      <aside className="hidden max-w-sm lg:block">
-        <p className="text-sm font-bold tracking-tight">
-          HERFLOW <span className="text-primary">AI</span>
-        </p>
-        <h2 className="mt-4 text-4xl font-semibold leading-tight tracking-tight text-balance">
-          Smart menstrual health, built for campus life.
-        </h2>
-        <p className="mt-4 text-base leading-relaxed text-muted-foreground">
-          Private cycle tracking, one-tap emergency pad support, live dispenser availability and an AI assistant in
-          English and Hindi.
-        </p>
-        <ul className="mt-8 space-y-3 text-sm">
-          {['CycleGuard · tracking & insights', 'PeriodMate · emergency support', 'PadWatch · live availability', 'PeriodLens · AI assistant', 'Pad-to-Pad · community'].map((f) => (
-            <li key={f} className="flex items-center gap-3">
-              <span className="size-1.5 rounded-full bg-primary" aria-hidden="true" />
-              {f}
-            </li>
-          ))}
-        </ul>
-      </aside>
-
-      <div className="relative flex h-dvh w-full max-w-[420px] flex-col overflow-clip bg-background lg:h-[min(880px,calc(100dvh-5rem))] lg:rounded-[2.75rem] lg:border-[10px] lg:border-foreground lg:shadow-[0_40px_80px_-30px_rgba(41,40,50,0.45)]">
-        <main ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain">
-          <Activity mode={tab === 'home' ? 'visible' : 'hidden'}>
-            <HomeScreen onNavigate={navigate} {...requestHandlers} />
-          </Activity>
-          <Activity mode={tab === 'cycle' ? 'visible' : 'hidden'}>
-            <CycleScreen />
-          </Activity>
-          <Activity mode={tab === 'support' ? 'visible' : 'hidden'}>
-            <SupportScreen view={supportView} onViewChange={setSupportView} {...requestHandlers} />
-          </Activity>
-          <Activity mode={tab === 'assistant' ? 'visible' : 'hidden'}>
-            <AssistantScreen />
-          </Activity>
-          <Activity mode={tab === 'profile' ? 'visible' : 'hidden'}>
-            <ProfileScreen onReplayOnboarding={() => setOnboarding(true)} />
-          </Activity>
+    <>
+      {/* ── MOBILE LAYOUT (< lg) ─────────────────────────────────────────── */}
+      <div className="flex min-h-dvh flex-col bg-[radial-gradient(ellipse_at_top,#efedf6,transparent_60%),radial-gradient(ellipse_at_bottom_right,#f7e9eb,transparent_55%)] lg:hidden">
+        <main ref={mobileScrollRef} className="flex-1 overflow-y-auto overscroll-contain">
+          {screenContent}
         </main>
-
         <BottomNav active={tab} onChange={(t) => navigate(t)} />
-
         <EmergencySheet
           open={sosOpen}
           onClose={closeSos}
@@ -96,9 +83,85 @@ export function AppShell() {
             setSosOpen(false)
           }}
         />
-
         {onboarding ? <Onboarding onFinish={() => setOnboarding(false)} /> : null}
       </div>
-    </div>
+
+      {/* ── DESKTOP LAYOUT (≥ lg) ────────────────────────────────────────── */}
+      <div className="hidden min-h-dvh flex-col bg-[radial-gradient(ellipse_at_top,#efedf6,transparent_60%),radial-gradient(ellipse_at_bottom_right,#f7e9eb,transparent_55%)] lg:flex">
+        {/* Top navbar */}
+        <DesktopNav active={tab} onChange={(t) => navigate(t)} onOpenSos={() => setSosOpen(true)} />
+
+        {/* Body: sidebar + main content */}
+        <div className="mx-auto flex w-full max-w-7xl flex-1 gap-8 px-6 py-8 xl:px-10">
+          {/* Left sidebar – marketing / info panel */}
+          <aside className="hidden w-64 shrink-0 xl:block">
+            <div className="sticky top-24 space-y-6">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-primary">About</p>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                  Private cycle tracking, one-tap emergency pad support, live dispenser availability and an AI
+                  assistant in English and Hindi — built for campus life.
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Features</p>
+                <ul className="space-y-2.5 text-sm">
+                  {[
+                    { label: 'CycleGuard', desc: 'Tracking & insights' },
+                    { label: 'PeriodMate', desc: 'Emergency support' },
+                    { label: 'PadWatch', desc: 'Live availability' },
+                    { label: 'PeriodLens', desc: 'AI assistant' },
+                    { label: 'Pad-to-Pad', desc: 'Community' },
+                  ].map((f) => (
+                    <li key={f.label} className="flex items-start gap-2.5">
+                      <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary" aria-hidden="true" />
+                      <span>
+                        <span className="font-semibold">{f.label}</span>
+                        <span className="text-muted-foreground"> · {f.desc}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="rounded-2xl bg-sage-soft p-4 text-sm leading-relaxed text-sage-strong">
+                🔒 Private by design. Your data is encrypted and never sold.
+              </div>
+            </div>
+          </aside>
+
+          {/* Main scrollable content area */}
+          <div
+            ref={desktopScrollRef}
+            className="min-w-0 flex-1 overflow-y-auto rounded-3xl border border-border/60 bg-background shadow-[0_4px_32px_-8px_rgba(41,40,50,0.1)]"
+            style={{ maxHeight: 'calc(100dvh - 7rem)' }}
+          >
+            {screenContent}
+          </div>
+        </div>
+
+        {/* Desktop emergency sheet (portal-style, fixed) */}
+        {sosOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 backdrop-blur-sm">
+            <div className="relative w-full max-w-lg overflow-y-auto max-h-[90vh]">
+              <EmergencySheet
+                open={sosOpen}
+                onClose={closeSos}
+                bare
+                onSubmit={(data) => {
+                  setRequest({ ...data, id: crypto.randomUUID(), status: 'pending', helper: null })
+                  setSosOpen(false)
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {onboarding ? (
+          <div className="fixed inset-0 z-50 bg-background">
+            <Onboarding onFinish={() => setOnboarding(false)} />
+          </div>
+        ) : null}
+      </div>
+    </>
   )
 }
