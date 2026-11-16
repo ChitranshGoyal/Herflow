@@ -34,6 +34,9 @@ export function AppShell() {
     if (view) setSupportView(view)
     setTab(next)
     scrollRef.current?.scrollTo({ top: 0 })
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
   }
 
   const closeSos = useCallback(() => setSosOpen(false), [])
@@ -50,20 +53,20 @@ export function AppShell() {
   const mobileActiveTab: TabId = tab === 'about' ? 'home' : tab
 
   return (
-    <div className="fixed inset-0 flex flex-col overflow-hidden bg-[radial-gradient(ellipse_at_top,#efedf6,transparent_60%),radial-gradient(ellipse_at_bottom_right,#f7e9eb,transparent_55%)]">
+    <div className="fixed inset-0 flex flex-col overflow-hidden lg:static lg:min-h-screen lg:overflow-visible bg-[radial-gradient(ellipse_at_top,#efedf6,transparent_60%),radial-gradient(ellipse_at_bottom_right,#f7e9eb,transparent_55%)]">
       {/* ── DESKTOP HEADER (≥ lg) ── */}
-      <div className="hidden lg:block shrink-0">
+      <div className="hidden lg:block shrink-0 sticky top-0 z-40">
         <DesktopNav active={tab} onChange={navigate} onOpenSos={() => setSosOpen(true)} />
       </div>
 
       {/* ── CONTENT AREA ── */}
-      <div className="flex-1 min-h-0 flex flex-col overflow-hidden lg:mx-auto lg:w-full lg:max-w-7xl lg:flex-row lg:gap-8 lg:px-6 lg:py-6 xl:px-10">
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden lg:flex-none lg:overflow-visible lg:mx-auto lg:w-full lg:max-w-7xl lg:flex-row lg:items-start lg:gap-8 lg:px-6 lg:py-8 xl:px-10">
         {/* Desktop Left Sidebar (≥ xl) */}
-        <aside className="hidden xl:flex w-64 shrink-0 flex-col gap-5 overflow-y-auto pr-2">
+        <aside className="hidden xl:flex w-64 shrink-0 flex-col gap-5 sticky top-24 self-start">
           <div className="rounded-2xl bg-sage-soft p-4 text-sm leading-relaxed text-sage-strong">
             🔒 Private by design. Encrypted. Never sold.
           </div>
-          <div className="rounded-2xl border border-border/70 bg-card p-4">
+          <div className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Quick Navigation</p>
             <ul className="space-y-1.5 text-sm">
               {(
@@ -92,17 +95,17 @@ export function AppShell() {
               ))}
             </ul>
           </div>
-          <div className="rounded-2xl border border-border/70 bg-card p-4 text-xs text-muted-foreground leading-relaxed">
+          <div className="rounded-2xl border border-border/70 bg-card p-4 text-xs text-muted-foreground leading-relaxed shadow-sm">
             <p className="font-semibold text-foreground text-sm mb-1">HERFLOW AI</p>
             Smart menstrual health built for campus life. Cycle tracking, emergency pad delivery, dispenser telemetry & health AI.
           </div>
         </aside>
 
-        {/* Main Scrollable Content Card */}
-        <div className="flex-1 min-h-0 flex flex-col overflow-hidden lg:rounded-3xl lg:border lg:border-border/60 lg:bg-background lg:shadow-[0_4px_32px_-8px_rgba(41,40,50,0.1)]">
+        {/* Main Content Card */}
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden lg:flex-1 lg:min-w-0 lg:overflow-visible lg:rounded-3xl lg:border lg:border-border/60 lg:bg-background lg:shadow-[0_4px_32px_-8px_rgba(41,40,50,0.1)]">
           <main
             ref={scrollRef}
-            className="flex-1 min-h-0 overflow-y-auto overscroll-contain"
+            className="flex-1 min-h-0 overflow-y-auto overscroll-contain lg:flex-none lg:overflow-visible"
           >
             {tab === 'about' ? (
               <AboutScreen onNavigate={(t) => navigate(t)} />
@@ -128,6 +131,19 @@ export function AppShell() {
           </main>
         </div>
       </div>
+
+      {/* ── DESKTOP FOOTER (≥ lg) ── */}
+      <footer className="hidden lg:block border-t border-border/60 bg-background/60 py-6 mt-12 backdrop-blur-sm">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 xl:px-10 text-xs text-muted-foreground">
+          <p>© 2026 HERFLOW AI · Smart Menstrual Health Ecosystem</p>
+          <div className="flex gap-4">
+            <button type="button" onClick={() => navigate('about')} className="hover:underline cursor-pointer">About</button>
+            <button type="button" onClick={() => navigate('cycle')} className="hover:underline cursor-pointer">CycleGuard</button>
+            <button type="button" onClick={() => navigate('support')} className="hover:underline cursor-pointer">PeriodMate</button>
+            <button type="button" onClick={() => navigate('assistant')} className="hover:underline cursor-pointer">PeriodLens</button>
+          </div>
+        </div>
+      </footer>
 
       {/* ── MOBILE BOTTOM NAV (< lg) ── */}
       <BottomNav
