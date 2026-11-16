@@ -1,16 +1,19 @@
 'use client'
 
-import { CalendarHeart, HandHeart, House, MapPin, Sparkles, UserRound } from 'lucide-react'
+import { CalendarHeart, HandHeart, House, Info, MapPin, Sparkles, UserRound } from 'lucide-react'
 import type { TabId } from '@/lib/herflow-data'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
-const items: { id: TabId; label: string; icon: typeof House }[] = [
+export type DesktopTabId = TabId | 'about'
+
+const items: { id: DesktopTabId; label: string; icon: typeof House }[] = [
   { id: 'home', label: 'Home', icon: House },
   { id: 'cycle', label: 'Cycle', icon: CalendarHeart },
   { id: 'support', label: 'Support', icon: HandHeart },
   { id: 'assistant', label: 'AI Assistant', icon: Sparkles },
   { id: 'profile', label: 'Profile', icon: UserRound },
+  { id: 'about', label: 'About', icon: Info },
 ]
 
 export function DesktopNav({
@@ -18,8 +21,8 @@ export function DesktopNav({
   onChange,
   onOpenSos,
 }: {
-  active: TabId
-  onChange: (tab: TabId) => void
+  active: DesktopTabId
+  onChange: (tab: DesktopTabId) => void
   onOpenSos: () => void
 }) {
   return (

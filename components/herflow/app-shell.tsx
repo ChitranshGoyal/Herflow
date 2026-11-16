@@ -2,19 +2,22 @@
 
 import { Activity, useCallback, useEffect, useRef, useState } from 'react'
 import { BottomNav } from './bottom-nav'
-import { DesktopNav } from './desktop-nav'
+import { DesktopNav, type DesktopTabId } from './desktop-nav'
 import { HomeScreen } from './home-screen'
 import { CycleScreen } from './cycle-screen'
 import { SupportScreen, type SupportView } from './support-screen'
 import { AssistantScreen } from './assistant-screen'
 import { ProfileScreen } from './profile-screen'
+import { AboutScreen } from './about-screen'
 import { EmergencySheet } from './emergency-sheet'
 import { Onboarding } from './onboarding'
 import { helpers, type TabId } from '@/lib/herflow-data'
 import type { PadRequest } from '@/lib/request-types'
 
 export function AppShell() {
+  // Mobile uses TabId only; desktop has an extra 'about' tab
   const [tab, setTab] = useState<TabId>('home')
+  const [desktopTab, setDesktopTab] = useState<DesktopTabId>('home')
   const [supportView, setSupportView] = useState<SupportView>('periodmate')
   const [sosOpen, setSosOpen] = useState(false)
   const [onboarding, setOnboarding] = useState(false)
@@ -30,10 +33,20 @@ export function AppShell() {
     return () => clearTimeout(timer)
   }, [request?.status])
 
+  /** Navigate mobile tabs */
   const navigate = (next: TabId, view?: SupportView) => {
     if (view) setSupportView(view)
     setTab(next)
+    setDesktopTab(next)
     mobileScrollRef.current?.scrollTo({ top: 0 })
+    desktopScrollRef.current?.scrollTo({ top: 0 })
+  }
+
+  /** Navigate desktop tabs (includes 'about') */
+  const navigateDesktop = (next: DesktopTabId, view?: SupportView) => {
+    if (view) setSupportView(view)
+    setDesktopTab(next)
+    if (next !== 'about') setTab(next as TabId)
     desktopScrollRef.current?.scrollTo({ top: 0 })
   }
 
@@ -47,7 +60,8 @@ export function AppShell() {
     onDismissRequest: () => setRequest(null),
   }
 
-  const screenContent = (
+  /** Shared screen content (tabs common to both mobile + desktop) */
+  const appScreens = (
     <>
       <Activity mode={tab === 'home' ? 'visible' : 'hidden'}>
         <HomeScreen onNavigate={navigate} {...requestHandlers} />
@@ -69,77 +83,92 @@ export function AppShell() {
 
   return (
     <>
-      {/* ── MOBILE LAYOUT (< lg) ─────────────────────────────────────────── */}
-      <div className="flex min-h-dvh flex-col bg-[radial-gradient(ellipse_at_top,#efedf6,transparent_60%),radial-gradient(ellipse_at_bottom_right,#f7e9eb,transparent_55%)] lg:hidden">
+      {/* ══════════════════════════════════════════════════════════════════════
+          MOBILE LAYOUT  (< lg)
+          Fix: h-dvh (not min-h-dvh) so flex-1 is bounded and scroll works
+      ══════════════════════════════════════════════════════════════════════ */}
+      <div className="flex h-dvh flex-col bg-[radial-gradient(ellipse_at_top,#efedf6,transparent_60%),radial-gradient(ellipse_at_bottom_right,#f7e9eb,transparent_55%)] lg:hidden">
         <main ref={mobileScrollRef} className="flex-1 overflow-y-auto overscroll-contain">
-          {screenContent}
+          {appScreens}
         </main>
+
         <BottomNav active={tab} onChange={(t) => navigate(t)} />
-        <EmergencySheet
-          open={sosOpen}
-          onClose={closeSos}
-          onSubmit={(data) => {
-            setRequest({ ...data, id: crypto.randomUUID(), status: 'pending', helper: null })
-            setSosOpen(false)
-          }}
-        />
+
+        {/* Mobile emergency sheet — absolute inside phone height */}
+        <div className="absolute inset-0 z-50 pointer-events-none">
+          <div className="pointer-events-auto h-full">
+            <EmergencySheet
+              open={sosOpen}
+              onClose={closeSos}
+              onSubmit={(data) => {
+                setRequest({ ...data, id: crypto.randomUUID(), status: 'pending', helper: null })
+                setSosOpen(false)
+              }}
+            />
+          </div>
+        </div>
+
         {onboarding ? <Onboarding onFinish={() => setOnboarding(false)} /> : null}
       </div>
 
-      {/* ── DESKTOP LAYOUT (≥ lg) ────────────────────────────────────────── */}
+      {/* ══════════════════════════════════════════════════════════════════════
+          DESKTOP LAYOUT  (≥ lg)
+      ══════════════════════════════════════════════════════════════════════ */}
       <div className="hidden min-h-dvh flex-col bg-[radial-gradient(ellipse_at_top,#efedf6,transparent_60%),radial-gradient(ellipse_at_bottom_right,#f7e9eb,transparent_55%)] lg:flex">
-        {/* Top navbar */}
-        <DesktopNav active={tab} onChange={(t) => navigate(t)} onOpenSos={() => setSosOpen(true)} />
+        {/* Top navbar with About link */}
+        <DesktopNav active={desktopTab} onChange={navigateDesktop} onOpenSos={() => setSosOpen(true)} />
 
-        {/* Body: sidebar + main content */}
+        {/* Body */}
         <div className="mx-auto flex w-full max-w-7xl flex-1 gap-8 px-6 py-8 xl:px-10">
-          {/* Left sidebar – marketing / info panel */}
-          <aside className="hidden w-64 shrink-0 xl:block">
-            <div className="sticky top-24 space-y-6">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-primary">About</p>
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                  Private cycle tracking, one-tap emergency pad support, live dispenser availability and an AI
-                  assistant in English and Hindi — built for campus life.
-                </p>
+          {/* Left sidebar */}
+          <aside className="hidden w-56 shrink-0 xl:block">
+            <div className="sticky top-24 space-y-5">
+              <div className="rounded-2xl bg-sage-soft p-4 text-sm leading-relaxed text-sage-strong">
+                🔒 Private by design. Encrypted. Never sold.
               </div>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Features</p>
-                <ul className="space-y-2.5 text-sm">
-                  {[
-                    { label: 'CycleGuard', desc: 'Tracking & insights' },
-                    { label: 'PeriodMate', desc: 'Emergency support' },
-                    { label: 'PadWatch', desc: 'Live availability' },
-                    { label: 'PeriodLens', desc: 'AI assistant' },
-                    { label: 'Pad-to-Pad', desc: 'Community' },
-                  ].map((f) => (
-                    <li key={f.label} className="flex items-start gap-2.5">
-                      <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary" aria-hidden="true" />
-                      <span>
-                        <span className="font-semibold">{f.label}</span>
-                        <span className="text-muted-foreground"> · {f.desc}</span>
-                      </span>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Quick links</p>
+                <ul className="space-y-1 text-sm">
+                  {(
+                    [
+                      { id: 'cycle' as DesktopTabId, label: 'View your cycle' },
+                      { id: 'support' as DesktopTabId, label: 'Get a pad now' },
+                      { id: 'assistant' as DesktopTabId, label: 'Ask PeriodLens' },
+                      { id: 'about' as DesktopTabId, label: 'About HERFLOW' },
+                    ] as { id: DesktopTabId; label: string }[]
+                  ).map((l) => (
+                    <li key={l.id}>
+                      <button
+                        type="button"
+                        onClick={() => navigateDesktop(l.id)}
+                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      >
+                        <span className="size-1.5 shrink-0 rounded-full bg-primary" aria-hidden="true" />
+                        {l.label}
+                      </button>
                     </li>
                   ))}
                 </ul>
               </div>
-              <div className="rounded-2xl bg-sage-soft p-4 text-sm leading-relaxed text-sage-strong">
-                🔒 Private by design. Your data is encrypted and never sold.
-              </div>
             </div>
           </aside>
 
-          {/* Main scrollable content area */}
+          {/* Main content panel */}
           <div
             ref={desktopScrollRef}
             className="min-w-0 flex-1 overflow-y-auto rounded-3xl border border-border/60 bg-background shadow-[0_4px_32px_-8px_rgba(41,40,50,0.1)]"
             style={{ maxHeight: 'calc(100dvh - 7rem)' }}
           >
-            {screenContent}
+            {/* About page (desktop-only) */}
+            {desktopTab === 'about' ? (
+              <AboutScreen onNavigate={(t) => navigateDesktop(t)} />
+            ) : (
+              appScreens
+            )}
           </div>
         </div>
 
-        {/* Desktop emergency sheet (portal-style, fixed) */}
+        {/* Desktop emergency sheet — centered modal */}
         {sosOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 backdrop-blur-sm">
             <div className="relative w-full max-w-lg overflow-y-auto max-h-[90vh]">
