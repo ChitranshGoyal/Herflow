@@ -12,11 +12,22 @@ const items: { id: TabId; label: string; icon: typeof House }[] = [
   { id: 'profile', label: 'Profile', icon: UserRound },
 ]
 
-export function BottomNav({ active, onChange }: { active: TabId; onChange: (tab: TabId) => void }) {
+export function BottomNav({
+  active,
+  onChange,
+  className,
+}: {
+  active: TabId
+  onChange: (tab: TabId) => void
+  className?: string
+}) {
   return (
     <nav
       aria-label="Primary"
-      className="sticky bottom-0 z-30 border-t border-border/70 bg-card/90 px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 backdrop-blur-xl"
+      className={cn(
+        'shrink-0 sticky bottom-0 z-30 border-t border-border/70 bg-card/95 px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 backdrop-blur-xl',
+        className,
+      )}
     >
       <ul className="grid grid-cols-5">
         {items.map(({ id, label, icon: Icon }) => {
@@ -28,7 +39,7 @@ export function BottomNav({ active, onChange }: { active: TabId; onChange: (tab:
                 onClick={() => onChange(id)}
                 aria-current={isActive ? 'page' : undefined}
                 className={cn(
-                  'flex w-full flex-col items-center gap-1 rounded-2xl py-1.5 text-[11px] font-medium transition-colors',
+                  'flex w-full flex-col items-center gap-1 rounded-2xl py-1.5 text-[11px] font-medium transition-colors cursor-pointer select-none',
                   isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
                 )}
               >
