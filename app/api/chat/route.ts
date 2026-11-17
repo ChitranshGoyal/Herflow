@@ -5,7 +5,7 @@ import {
   createUIMessageStreamResponse,
   createUIMessageStream,
 } from 'ai'
-import { createGoogle } from '@ai-sdk/google'
+import { google } from '@ai-sdk/google'
 
 export const maxDuration = 30
 
@@ -32,104 +32,81 @@ export type UserContext = {
 }
 
 export async function POST(req: Request) {
-  try {
-    const {
-      messages,
-      language = 'en',
-      userContext,
-    }: {
-      messages: UIMessage[]
-      language?: 'en' | 'hi'
-      userContext?: UserContext
-    } = await req.json()
+  let bodyData: Record<string, unknown> = {}
 
-    // Support all common naming variants for the Gemini API key
+  try {
+    bodyData = await req.json()
+  } catch {
+    return new Response('Invalid JSON body', { status: 400 })
+  }
+
+  try {
+    const messages: UIMessage[] = (bodyData.messages as UIMessage[]) || []
+    const language: string = (bodyData.language as string) || 'en'
+    const userContext = bodyData.userContext as UserContext | undefined
+
+    // Check API key
     const rawKey =
       process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
       process.env.GEMINI_API_KEY ||
-      process.env.GOOGLE_API_KEY ||
-      process.env.NEXT_PUBLIC_GOOGLE_GENERATIVE_AI_API_KEY ||
-      process.env.NEXT_PUBLIC_GEMINI_API_KEY
+      process.env.GOOGLE_API_KEY
 
     const apiKey = rawKey?.trim().replace(/^["']|["']$/g, '')
 
-    // If no API key was passed to the current deployment, stream a helpful notice
     if (!apiKey) {
       return streamNotice(
-        language === 'hi'
-          ? `नमस्ते ${userContext?.name || ''}! PeriodLens AI को सक्रिय करने के लिए Vercel में GOOGLE_GENERATIVE_AI_API_KEY सेट होना आवश्यक है। Vercel में Environment Variable जोड़ने के बाद "Redeploy" करना अनिवार्य होता है।`
-          : `Hi ${userContext?.name || 'there'}! To activate PeriodLens AI, your GOOGLE_GENERATIVE_AI_API_KEY must be set in Vercel Project Settings. After adding it, you must trigger a Redeploy.`
+        'PeriodLens is not configured yet. Please set GOOGLE_GENERATIVE_AI_API_KEY in your Vercel environment variables and redeploy.'
       )
     }
 
-    // Build personalized prompt based on individual user's cycle telemetry
+    // Build personalized system prompt
     let contextSnippet = ''
     if (userContext) {
-      contextSnippet = `
-Current User Telemetry (Personalize your response based on this):
-- Name: ${userContext.name || 'Student'} (${userContext.campus || 'Campus'})
-- Cycle State: Day ${userContext.cycleDay ?? 14} of ${userContext.cycleLength ?? 28} (${userContext.phase || 'Ovulation window'})
-- Next Period: in ${userContext.nextPeriodInDays ?? 14} days
-- Today's Logged Mood: ${userContext.todayMood || 'Not recorded today'}
-- Today's Logged Symptoms: ${
-        userContext.todaySymptoms && userContext.todaySymptoms.length > 0
-          ? userContext.todaySymptoms.join(', ')
-          : 'None recorded today'
-      }
-`
+      contextSnippet = `\nCurrent User Telemetry:\n- Name: ${userContext.name || 'Student'} (${userContext.campus || 'Campus'})\n- Cycle Day: ${userContext.cycleDay ?? 14} of ${userContext.cycleLength ?? 28} (${userContext.phase || 'Ovulation window'})\n- Next Period: in ${userContext.nextPeriodInDays ?? 14} days\n- Mood: ${userContext.todayMood || 'Not recorded'}\n- Symptoms: ${userContext.todaySymptoms?.length ? userContext.todaySymptoms.join(', ') : 'None recorded'}`
     }
 
-    const languageInstruction =
+    const langNote =
       language === 'hi'
-        ? 'Respond in simple, natural, empathetic Hindi (Devanagari script).'
-        : 'Respond in clear, supportive, and compassionate English.'
+        ? 'Respond in simple, empathetic Hindi (Devanagari script).'
+        : 'Respond in clear, supportive English.'
 
-    const fullSystemPrompt = `${BASE_SYSTEM_PROMPT}
-
-${contextSnippet}
-
-Language Directive:
-${languageInstruction}`
-
-    // Set the env var so the SDK can also read it automatically
-    process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey
-
-    const google = createGoogle({ apiKey })
+    const systemPrompt = `${BASE_SYSTEM_PROMPT}\n${contextSnippet}\n\nLanguage: ${langNote}`
 
     // Convert UI messages to model messages
     const modelMessages = await convertToModelMessages(messages)
 
-    // Guard: if no messages to send, return a greeting
     if (!modelMessages || modelMessages.length === 0) {
       return streamNotice(
         language === 'hi'
           ? 'नमस्ते! आज मैं आपकी कैसे मदद कर सकती हूँ?'
-          : 'Hi there! How can I help you with your menstrual health today?'
+          : 'Hi there! How can I help you today?'
       )
     }
 
+    // Use the default google provider — reads GOOGLE_GENERATIVE_AI_API_KEY from env automatically
     const result = streamText({
       model: google('gemini-2.0-flash'),
-      system: fullSystemPrompt,
+      system: systemPrompt,
       messages: modelMessages,
-      onError({ error }) {
-        console.error('PeriodLens Gemini streaming error:', error)
-      },
     })
 
-    return result.toUIMessageStreamResponse()
+    return result.toUIMessageStreamResponse({
+      sendReasoning: false,
+      onError(error) {
+        console.error('[PeriodLens] Stream error:', error)
+        // Return a user-visible string — this replaces the default "An error occurred."
+        return `Gemini API error: ${error instanceof Error ? error.message : String(error)}`
+      },
+    })
   } catch (err: unknown) {
-    console.error('PeriodLens AI error:', err)
-    const errorMsg =
-      err instanceof Error ? err.message : String(err)
-
+    console.error('[PeriodLens] Route error:', err)
     return streamNotice(
-      `PeriodLens Error: ${errorMsg}\n\nPlease check your GOOGLE_GENERATIVE_AI_API_KEY in Vercel settings and trigger a Redeploy.`
+      `PeriodLens Error: ${err instanceof Error ? err.message : String(err)}\n\nPlease verify your API key in Vercel settings and redeploy.`
     )
   }
 }
 
-/** Helper: stream a plain-text notice back to the UI */
+/** Stream a plain-text notice as an assistant message (always returns 200) */
 function streamNotice(text: string) {
   const stream = createUIMessageStream({
     execute({ writer }) {

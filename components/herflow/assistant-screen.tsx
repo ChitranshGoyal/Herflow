@@ -28,28 +28,31 @@ export function AssistantScreen() {
   const [input, setInput] = useState('')
   const [listening, setListening] = useState(false)
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
-  const { messages, sendMessage, status, stop, error } = useChat()
+  const [chatError, setChatError] = useState<string | null>(null)
+  const { messages, sendMessage, status, stop, error } = useChat({
+    body: {
+      language,
+      userContext: {
+        name: user.name,
+        campus: user.campus,
+        cycleDay: user.cycleDay,
+        cycleLength: user.cycleLength,
+        phase: user.phase,
+        nextPeriodInDays: user.nextPeriodInDays,
+      },
+    },
+    onError(err) {
+      console.error('PeriodLens chat error:', err)
+      setChatError(err.message || String(err))
+    },
+  })
   const busy = status === 'submitted' || status === 'streaming'
 
   const send = (text: string) => {
     const trimmed = text.trim()
     if (!trimmed || busy) return
-    sendMessage(
-      { text: trimmed },
-      {
-        body: {
-          language,
-          userContext: {
-            name: user.name,
-            campus: user.campus,
-            cycleDay: user.cycleDay,
-            cycleLength: user.cycleLength,
-            phase: user.phase,
-            nextPeriodInDays: user.nextPeriodInDays,
-          },
-        },
-      }
-    )
+    setChatError(null)
+    sendMessage({ text: trimmed })
     setInput('')
   }
 
@@ -203,11 +206,11 @@ export function AssistantScreen() {
           </ul>
         )}
 
-        {error ? (
+        {(error || chatError) ? (
           <div className="rounded-2xl bg-destructive/10 p-4 text-xs text-destructive space-y-1.5" role="alert">
             <p className="font-semibold text-sm">Something went wrong:</p>
             <p className="font-mono text-xs break-all bg-card/60 p-2.5 rounded-xl border border-destructive/20">
-              {error.message || 'Please check your connection and try again.'}
+              {chatError || error?.message || 'Please check your connection and try again.'}
             </p>
           </div>
         ) : null}
