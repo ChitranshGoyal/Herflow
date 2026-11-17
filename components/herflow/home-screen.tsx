@@ -5,10 +5,11 @@ import { ArrowRight, Bell, Check, ChevronRight, MapPin, ShieldCheck, Sparkles } 
 import { Button } from '@/components/ui/button'
 import { Card, Chip, SectionHeader, StockBadge, StockBar } from './primitives'
 import { RequestStatusCard } from './request-status-card'
-import { dispensers, moods, symptoms, user, type TabId } from '@/lib/herflow-data'
+import { dispensers, moods, symptoms, user as defaultUser, type TabId } from '@/lib/herflow-data'
 import type { PadRequest } from '@/lib/request-types'
 import { saveDailyCheckIn } from '@/lib/supabase/services'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/lib/auth-context'
 
 export function HomeScreen({
   onNavigate,
@@ -25,6 +26,9 @@ export function HomeScreen({
   onCancelRequest: () => void
   onDismissRequest: () => void
 }) {
+  const { user: authUser } = useAuth()
+  const user = authUser || defaultUser
+
   return (
     <div className="space-y-5 px-5 pb-8 pt-6">
       <header className="flex items-center justify-between">
@@ -42,7 +46,7 @@ export function HomeScreen({
         </button>
       </header>
 
-      <CycleOverviewCard onOpen={() => onNavigate('cycle')} />
+      <CycleOverviewCard user={user} onOpen={() => onNavigate('cycle')} />
 
       {request ? (
         <RequestStatusCard
@@ -64,8 +68,10 @@ export function HomeScreen({
   )
 }
 
-function CycleOverviewCard({ onOpen }: { onOpen: () => void }) {
-  const progress = user.cycleDay / user.cycleLength
+function CycleOverviewCard({ onOpen, user }: { onOpen: () => void; user: { cycleDay?: number; cycleLength?: number; phase?: string } }) {
+  const cycleDay = user.cycleDay ?? 14
+  const cycleLength = user.cycleLength ?? 28
+  const progress = cycleDay / cycleLength
   const radius = 52
   const circumference = 2 * Math.PI * radius
 
@@ -94,15 +100,15 @@ function CycleOverviewCard({ onOpen }: { onOpen: () => void }) {
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <span className="text-xs font-medium text-white/80">Day</span>
-            <span className="text-4xl font-semibold leading-none">{user.cycleDay}</span>
-            <span className="mt-0.5 text-xs text-white/80">of {user.cycleLength}</span>
+            <span className="text-4xl font-semibold leading-none">{cycleDay}</span>
+            <span className="mt-0.5 text-xs text-white/80">of {cycleLength}</span>
           </div>
         </div>
         <div className="min-w-0 flex-1">
           <h2 id="cycle-overview-title" className="text-xs font-semibold uppercase tracking-wider text-white/80">
             CycleGuard
           </h2>
-          <p className="mt-1 text-lg font-semibold leading-snug">{user.phase}</p>
+          <p className="mt-1 text-lg font-semibold leading-snug">{user.phase || 'Ovulation window'}</p>
           <p className="mt-3 text-sm text-white/85">Next period estimate</p>
           <p className="text-2xl font-semibold">In {user.nextPeriodInDays} days</p>
           <p className="mt-0.5 text-xs text-white/75">Around 30 Nov · based on 6 cycles</p>

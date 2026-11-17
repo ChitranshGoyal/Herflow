@@ -5,17 +5,31 @@ import {
   ChevronRight,
   Fingerprint,
   Globe,
+  GraduationCap,
   HeartPulse,
   LogOut,
   PlayCircle,
   Phone,
   ShieldCheck,
+  Sparkles,
   type LucideIcon,
 } from 'lucide-react'
 import { Card, Toggle } from './primitives'
-import { user } from '@/lib/herflow-data'
+import { user as defaultUser } from '@/lib/herflow-data'
+import { useAuth } from '@/lib/auth-context'
 
-export function ProfileScreen({ onReplayOnboarding }: { onReplayOnboarding: () => void }) {
+export function ProfileScreen({
+  onReplayOnboarding,
+  onOpenAuth,
+}: {
+  onReplayOnboarding: () => void
+  onOpenAuth?: () => void
+}) {
+  const { user: authUser, isDemo, signOut } = useAuth()
+  const displayName = authUser?.name || defaultUser.name
+  const displayCampus = authUser?.campus || defaultUser.campus
+  const displayEmail = authUser?.email || ''
+
   const [settings, setSettings] = useState({
     anonymous: true,
     lock: true,
@@ -30,14 +44,49 @@ export function ProfileScreen({ onReplayOnboarding }: { onReplayOnboarding: () =
   return (
     <div className="space-y-5 px-5 pb-8 pt-6">
       <header className="flex items-center gap-4">
-        <span className="flex size-16 items-center justify-center rounded-full bg-gradient-to-br from-lavender to-rose text-2xl font-semibold text-white">
-          {user.name.charAt(0)}
+        <span className="flex size-16 items-center justify-center rounded-full bg-gradient-to-br from-lavender to-rose text-2xl font-semibold text-white shadow-sm">
+          {displayName.charAt(0)}
         </span>
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">{user.name}</h1>
-          <p className="text-sm text-muted-foreground">{user.campus} · Verified student</p>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-semibold tracking-tight truncate">{displayName}</h1>
+            {isDemo && (
+              <span className="rounded-full bg-lavender-soft px-2 py-0.5 text-[10px] font-bold text-primary">
+                Demo
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-0.5">
+            <GraduationCap className="size-3.5 text-primary" />
+            <span>{displayCampus}</span>
+            <span>·</span>
+            <span className="text-sage-strong font-medium">Verified Student</span>
+          </p>
+          {displayEmail && (
+            <p className="text-xs font-mono text-muted-foreground truncate mt-0.5">
+              {displayEmail}
+            </p>
+          )}
         </div>
       </header>
+
+      {isDemo && onOpenAuth && (
+        <div className="flex items-center justify-between rounded-2xl border border-primary/20 bg-lavender-soft/60 p-4 text-xs">
+          <div className="flex items-center gap-2.5">
+            <Sparkles className="size-4 text-primary shrink-0" />
+            <p className="text-foreground">
+              You are viewing in <strong>Campus Demo Mode</strong>.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onOpenAuth}
+            className="rounded-xl bg-primary px-3 py-1.5 font-semibold text-white hover:bg-primary/90 transition-colors cursor-pointer"
+          >
+            Sign In with College ID
+          </button>
+        </div>
+      )}
 
       <div className="flex items-center gap-3 rounded-2xl bg-sage-soft p-4">
         <ShieldCheck className="size-5 text-sage-strong" aria-hidden="true" />
@@ -74,10 +123,11 @@ export function ProfileScreen({ onReplayOnboarding }: { onReplayOnboarding: () =
 
       <button
         type="button"
-        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-border bg-card py-3.5 text-sm font-semibold text-destructive"
+        onClick={() => signOut()}
+        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-border bg-card py-3.5 text-sm font-semibold text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
       >
         <LogOut className="size-4" aria-hidden="true" />
-        Sign out
+        {isDemo ? 'Exit Demo & Sign Out' : 'Sign out'}
       </button>
       <p className="text-center text-xs text-muted-foreground">HERFLOW AI · v1.0</p>
     </div>

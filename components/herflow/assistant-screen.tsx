@@ -3,8 +3,9 @@
 import { useRef, useState } from 'react'
 import { useChat } from '@ai-sdk/react'
 import { AlertTriangle, ArrowUp, BookOpen, Mic, MicOff, Sparkles, Square } from 'lucide-react'
-import { myths, user } from '@/lib/herflow-data'
+import { myths, user as defaultUser } from '@/lib/herflow-data'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/lib/auth-context'
 
 type Language = 'en' | 'hi'
 
@@ -24,6 +25,9 @@ type SpeechRecognitionLike = {
 }
 
 export function AssistantScreen() {
+  const { user: authUser } = useAuth()
+  const user = authUser || defaultUser
+
   const [language, setLanguage] = useState<Language>('en')
   const [input, setInput] = useState('')
   const [listening, setListening] = useState(false)

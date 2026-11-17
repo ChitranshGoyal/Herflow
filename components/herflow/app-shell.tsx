@@ -11,6 +11,7 @@ import { ProfileScreen } from './profile-screen'
 import { AboutScreen } from './about-screen'
 import { EmergencySheet } from './emergency-sheet'
 import { Onboarding } from './onboarding'
+import { AuthModal, type AuthModalMode } from './auth-modal'
 import { helpers, type TabId } from '@/lib/herflow-data'
 import type { PadRequest } from '@/lib/request-types'
 import { submitPadRequest, updateRequestStatus } from '@/lib/supabase/services'
@@ -20,6 +21,10 @@ export function AppShell() {
   const [supportView, setSupportView] = useState<SupportView>('periodmate')
   const [sosOpen, setSosOpen] = useState(false)
   const [onboarding, setOnboarding] = useState(false)
+  const [authModalState, setAuthModalState] = useState<{ open: boolean; mode: AuthModalMode }>({
+    open: false,
+    mode: 'signin',
+  })
   const [request, setRequest] = useState<PadRequest | null>(null)
   const scrollRef = useRef<HTMLElement>(null)
 
@@ -75,7 +80,12 @@ export function AppShell() {
     <div className="fixed inset-0 flex flex-col overflow-hidden lg:static lg:min-h-screen lg:overflow-visible bg-[radial-gradient(ellipse_at_top,#efedf6,transparent_60%),radial-gradient(ellipse_at_bottom_right,#f7e9eb,transparent_55%)]">
       {/* ── DESKTOP HEADER (≥ lg) ── */}
       <div className="hidden lg:block shrink-0 sticky top-0 z-40">
-        <DesktopNav active={tab} onChange={navigate} onOpenSos={() => setSosOpen(true)} />
+        <DesktopNav
+          active={tab}
+          onChange={navigate}
+          onOpenSos={() => setSosOpen(true)}
+          onOpenAuth={() => setAuthModalState({ open: true, mode: 'signin' })}
+        />
       </div>
 
       {/* ── CONTENT AREA ── */}
@@ -143,7 +153,10 @@ export function AppShell() {
                   <AssistantScreen />
                 </Activity>
                 <Activity mode={tab === 'profile' ? 'visible' : 'hidden'}>
-                  <ProfileScreen onReplayOnboarding={() => setOnboarding(true)} />
+                  <ProfileScreen
+                    onReplayOnboarding={() => setOnboarding(true)}
+                    onOpenAuth={() => setAuthModalState({ open: true, mode: 'signin' })}
+                  />
                 </Activity>
               </>
             )}
@@ -182,6 +195,15 @@ export function AppShell() {
 
       {/* ── ONBOARDING MODAL ── */}
       {onboarding && <Onboarding onFinish={() => setOnboarding(false)} />}
+
+      {/* ── AUTH MODAL ── */}
+      {authModalState.open && (
+        <AuthModal
+          isOpen={authModalState.open}
+          onClose={() => setAuthModalState((s) => ({ ...s, open: false }))}
+          initialMode={authModalState.mode}
+        />
+      )}
     </div>
   )
 }
