@@ -4,6 +4,7 @@ import {
   convertToModelMessages,
   createUIMessageStreamResponse,
   toUIMessageStream,
+  createUIMessageStream,
 } from 'ai'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 
@@ -32,80 +33,110 @@ export type UserContext = {
 }
 
 export async function POST(req: Request) {
-  const {
-    messages,
-    language = 'en',
-    userContext,
-  }: {
-    messages: UIMessage[]
-    language?: 'en' | 'hi'
-    userContext?: UserContext
-  } = await req.json()
+  try {
+    const {
+      messages,
+      language = 'en',
+      userContext,
+    }: {
+      messages: UIMessage[]
+      language?: 'en' | 'hi'
+      userContext?: UserContext
+    } = await req.json()
 
-  const apiKey =
-    process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
-    process.env.GEMINI_API_KEY
+    // Support all common naming variants for the Gemini API key
+    const rawKey =
+      process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
+      process.env.GEMINI_API_KEY ||
+      process.env.GOOGLE_API_KEY ||
+      process.env.NEXT_PUBLIC_GOOGLE_GENERATIVE_AI_API_KEY ||
+      process.env.NEXT_PUBLIC_GEMINI_API_KEY
 
-  // If no Gemini API key is configured yet, provide a friendly educational stream
-  if (!apiKey) {
-    const hintText =
-      language === 'hi'
-        ? `नमस्ते ${userContext?.name || ''}! PeriodLens AI (Google Gemini द्वारा संचालित) को सक्रिय करने के लिए, कृपया अपना निःशुल्क GOOGLE_GENERATIVE_AI_API_KEY .env.local या Vercel Environment Variables में जोड़ें।\n\nआप Google AI Studio (https://aistudio.google.com) से 30 सेकंड में मुफ़्त API key ले सकते हैं।`
-        : `Hi ${userContext?.name || 'there'}! To activate PeriodLens AI with Google Gemini, please add your free GOOGLE_GENERATIVE_AI_API_KEY in .env.local or your Vercel Project Settings.\n\nYou can generate a free Gemini API key in 30 seconds at https://aistudio.google.com.`
+    const apiKey = rawKey?.trim().replace(/^["']|["']$/g, '')
 
-    const fallbackStream = new ReadableStream({
-      start(controller) {
-        controller.enqueue({ type: 'text-delta', delta: hintText })
-        controller.enqueue({ type: 'finish' })
-        controller.close()
-      },
-    })
+    // If no API key was passed to the current deployment, stream a helpful notice
+    if (!apiKey) {
+      const hint =
+        language === 'hi'
+          ? `नमस्ते ${userContext?.name || ''}! PeriodLens AI को सक्रिय करने के लिए Vercel में GOOGLE_GENERATIVE_AI_API_KEY सेट होना आवश्यक है।\n\nयदि आपने अभी Environment Variable जोड़ा है, तो कृपया ध्यान दें: Vercel में Environment Variable जोड़ने के बाद "Redeploy" करना अनिवार्य होता है ताकि नए variables लागू हो सकें।`
+          : `Hi ${userContext?.name || 'there'}! To activate PeriodLens AI with Google Gemini, your GOOGLE_GENERATIVE_AI_API_KEY must be active.\n\nImportant note: If you just added the key in Vercel Project Settings, you must trigger a **Redeploy** (Deployments → Latest Deployment → Redeploy) for Vercel to inject the new key into the running application.`
 
-    return createUIMessageStreamResponse({
-      stream: toUIMessageStream({ stream: fallbackStream as unknown as ReadableStream }),
-    })
-  }
+      const stream = createUIMessageStream({
+        execute({ writer }) {
+          writer.write({ type: 'start' })
+          writer.write({ type: 'text-start', id: 'hint-1' })
+          writer.write({ type: 'text-delta', id: 'hint-1', delta: hint })
+          writer.write({ type: 'text-end', id: 'hint-1' })
+          writer.write({ type: 'finish' })
+        },
+      })
 
-  // Build personalized system prompt
-  let contextSnippet = ''
-  if (userContext) {
-    contextSnippet = `
+      return createUIMessageStreamResponse({ stream })
+    }
+
+    // Build personalized prompt based on individual user's cycle telemetry
+    let contextSnippet = ''
+    if (userContext) {
+      contextSnippet = `
 Current User Telemetry (Personalize your response based on this):
 - Name: ${userContext.name || 'Student'} (${userContext.campus || 'Campus'})
 - Cycle State: Day ${userContext.cycleDay ?? 14} of ${userContext.cycleLength ?? 28} (${userContext.phase || 'Ovulation window'})
 - Next Period: in ${userContext.nextPeriodInDays ?? 14} days
 - Today's Logged Mood: ${userContext.todayMood || 'Not recorded today'}
 - Today's Logged Symptoms: ${
-      userContext.todaySymptoms && userContext.todaySymptoms.length > 0
-        ? userContext.todaySymptoms.join(', ')
-        : 'None recorded today'
-    }
+        userContext.todaySymptoms && userContext.todaySymptoms.length > 0
+          ? userContext.todaySymptoms.join(', ')
+          : 'None recorded today'
+      }
 `
-  }
+    }
 
-  const languageInstruction =
-    language === 'hi'
-      ? 'Respond in simple, natural, empathetic Hindi (Devanagari script).'
-      : 'Respond in clear, supportive, and compassionate English.'
+    const languageInstruction =
+      language === 'hi'
+        ? 'Respond in simple, natural, empathetic Hindi (Devanagari script).'
+        : 'Respond in clear, supportive, and compassionate English.'
 
-  const fullSystemPrompt = `${BASE_SYSTEM_PROMPT}
+    const fullSystemPrompt = `${BASE_SYSTEM_PROMPT}
 
 ${contextSnippet}
 
 Language Directive:
 ${languageInstruction}`
 
-  const google = createGoogleGenerativeAI({
-    apiKey,
-  })
+    const google = createGoogleGenerativeAI({
+      apiKey,
+    })
 
-  const result = streamText({
-    model: google('gemini-1.5-flash'),
-    system: fullSystemPrompt,
-    messages: await convertToModelMessages(messages),
-  })
+    const modelMessages = await convertToModelMessages(messages)
 
-  return createUIMessageStreamResponse({
-    stream: toUIMessageStream({ stream: result.stream }),
-  })
+    const result = streamText({
+      model: google('gemini-1.5-flash'),
+      system: fullSystemPrompt,
+      messages: modelMessages,
+    })
+
+    return createUIMessageStreamResponse({
+      stream: toUIMessageStream({ stream: result.stream }),
+    })
+  } catch (err: unknown) {
+    console.error('PeriodLens AI error:', err)
+    const errorMsg =
+      err instanceof Error ? err.message : 'Unknown error communicating with Gemini AI.'
+
+    const stream = createUIMessageStream({
+      execute({ writer }) {
+        writer.write({ type: 'start' })
+        writer.write({ type: 'text-start', id: 'err-1' })
+        writer.write({
+          type: 'text-delta',
+          id: 'err-1',
+          delta: `PeriodLens Notice: ${errorMsg}\n\nPlease check your GOOGLE_GENERATIVE_AI_API_KEY in Vercel settings and ensure you have triggered a Redeploy.`,
+        })
+        writer.write({ type: 'text-end', id: 'err-1' })
+        writer.write({ type: 'finish' })
+      },
+    })
+
+    return createUIMessageStreamResponse({ stream })
+  }
 }
