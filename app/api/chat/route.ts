@@ -115,6 +115,10 @@ ${languageInstruction}`
       messages: modelMessages,
     })
 
+    if (typeof result.toUIMessageStreamResponse === 'function') {
+      return result.toUIMessageStreamResponse()
+    }
+
     return createUIMessageStreamResponse({
       stream: toUIMessageStream({ stream: result.stream }),
     })
