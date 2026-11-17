@@ -3,10 +3,9 @@ import {
   type UIMessage,
   convertToModelMessages,
   createUIMessageStreamResponse,
-  toUIMessageStream,
   createUIMessageStream,
 } from 'ai'
-import { createGoogleGenerativeAI } from '@ai-sdk/google'
+import { createGoogle } from '@ai-sdk/google'
 
 export const maxDuration = 30
 
@@ -56,22 +55,11 @@ export async function POST(req: Request) {
 
     // If no API key was passed to the current deployment, stream a helpful notice
     if (!apiKey) {
-      const hint =
+      return streamNotice(
         language === 'hi'
-          ? `नमस्ते ${userContext?.name || ''}! PeriodLens AI को सक्रिय करने के लिए Vercel में GOOGLE_GENERATIVE_AI_API_KEY सेट होना आवश्यक है।\n\nयदि आपने अभी Environment Variable जोड़ा है, तो कृपया ध्यान दें: Vercel में Environment Variable जोड़ने के बाद "Redeploy" करना अनिवार्य होता है ताकि नए variables लागू हो सकें।`
-          : `Hi ${userContext?.name || 'there'}! To activate PeriodLens AI with Google Gemini, your GOOGLE_GENERATIVE_AI_API_KEY must be active.\n\nImportant note: If you just added the key in Vercel Project Settings, you must trigger a **Redeploy** (Deployments → Latest Deployment → Redeploy) for Vercel to inject the new key into the running application.`
-
-      const stream = createUIMessageStream({
-        execute({ writer }) {
-          writer.write({ type: 'start' })
-          writer.write({ type: 'text-start', id: 'hint-1' })
-          writer.write({ type: 'text-delta', id: 'hint-1', delta: hint })
-          writer.write({ type: 'text-end', id: 'hint-1' })
-          writer.write({ type: 'finish' })
-        },
-      })
-
-      return createUIMessageStreamResponse({ stream })
+          ? `नमस्ते ${userContext?.name || ''}! PeriodLens AI को सक्रिय करने के लिए Vercel में GOOGLE_GENERATIVE_AI_API_KEY सेट होना आवश्यक है। Vercel में Environment Variable जोड़ने के बाद "Redeploy" करना अनिवार्य होता है।`
+          : `Hi ${userContext?.name || 'there'}! To activate PeriodLens AI, your GOOGLE_GENERATIVE_AI_API_KEY must be set in Vercel Project Settings. After adding it, you must trigger a Redeploy.`
+      )
     }
 
     // Build personalized prompt based on individual user's cycle telemetry
@@ -103,18 +91,25 @@ ${contextSnippet}
 Language Directive:
 ${languageInstruction}`
 
-    if (apiKey) {
-      process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey
-    }
+    // Set the env var so the SDK can also read it automatically
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey
 
-    const google = createGoogleGenerativeAI({
-      apiKey,
-    })
+    const google = createGoogle({ apiKey })
 
+    // Convert UI messages to model messages
     const modelMessages = await convertToModelMessages(messages)
 
+    // Guard: if no messages to send, return a greeting
+    if (!modelMessages || modelMessages.length === 0) {
+      return streamNotice(
+        language === 'hi'
+          ? 'नमस्ते! आज मैं आपकी कैसे मदद कर सकती हूँ?'
+          : 'Hi there! How can I help you with your menstrual health today?'
+      )
+    }
+
     const result = streamText({
-      model: google('gemini-1.5-flash'),
+      model: google('gemini-2.0-flash'),
       system: fullSystemPrompt,
       messages: modelMessages,
       onError({ error }) {
@@ -122,32 +117,28 @@ ${languageInstruction}`
       },
     })
 
-    if (typeof result.toUIMessageStreamResponse === 'function') {
-      return result.toUIMessageStreamResponse()
-    }
-
-    return createUIMessageStreamResponse({
-      stream: toUIMessageStream({ stream: result.stream }),
-    })
+    return result.toUIMessageStreamResponse()
   } catch (err: unknown) {
     console.error('PeriodLens AI error:', err)
     const errorMsg =
-      err instanceof Error ? err.message : 'Unknown error communicating with Gemini AI.'
+      err instanceof Error ? err.message : String(err)
 
-    const stream = createUIMessageStream({
-      execute({ writer }) {
-        writer.write({ type: 'start' })
-        writer.write({ type: 'text-start', id: 'err-1' })
-        writer.write({
-          type: 'text-delta',
-          id: 'err-1',
-          delta: `PeriodLens Notice: ${errorMsg}\n\nPlease check your GOOGLE_GENERATIVE_AI_API_KEY in Vercel settings and ensure you have triggered a Redeploy.`,
-        })
-        writer.write({ type: 'text-end', id: 'err-1' })
-        writer.write({ type: 'finish' })
-      },
-    })
-
-    return createUIMessageStreamResponse({ stream })
+    return streamNotice(
+      `PeriodLens Error: ${errorMsg}\n\nPlease check your GOOGLE_GENERATIVE_AI_API_KEY in Vercel settings and trigger a Redeploy.`
+    )
   }
+}
+
+/** Helper: stream a plain-text notice back to the UI */
+function streamNotice(text: string) {
+  const stream = createUIMessageStream({
+    execute({ writer }) {
+      writer.write({ type: 'start' })
+      writer.write({ type: 'text-start', id: 'notice-1' })
+      writer.write({ type: 'text-delta', id: 'notice-1', delta: text })
+      writer.write({ type: 'text-end', id: 'notice-1' })
+      writer.write({ type: 'finish' })
+    },
+  })
+  return createUIMessageStreamResponse({ stream })
 }
