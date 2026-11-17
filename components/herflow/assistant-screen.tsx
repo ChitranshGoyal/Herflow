@@ -30,17 +30,6 @@ export function AssistantScreen() {
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
   const [chatError, setChatError] = useState<string | null>(null)
   const { messages, sendMessage, status, stop, error } = useChat({
-    body: {
-      language,
-      userContext: {
-        name: user.name,
-        campus: user.campus,
-        cycleDay: user.cycleDay,
-        cycleLength: user.cycleLength,
-        phase: user.phase,
-        nextPeriodInDays: user.nextPeriodInDays,
-      },
-    },
     onError(err) {
       console.error('PeriodLens chat error:', err)
       setChatError(err.message || String(err))
