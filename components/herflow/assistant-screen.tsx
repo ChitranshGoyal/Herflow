@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react'
 import { useChat } from '@ai-sdk/react'
 import { AlertTriangle, ArrowUp, BookOpen, Mic, MicOff, Sparkles, Square } from 'lucide-react'
-import { myths } from '@/lib/herflow-data'
+import { myths, user } from '@/lib/herflow-data'
 import { cn } from '@/lib/utils'
 
 type Language = 'en' | 'hi'
@@ -34,7 +34,22 @@ export function AssistantScreen() {
   const send = (text: string) => {
     const trimmed = text.trim()
     if (!trimmed || busy) return
-    sendMessage({ text: trimmed }, { body: { language } })
+    sendMessage(
+      { text: trimmed },
+      {
+        body: {
+          language,
+          userContext: {
+            name: user.name,
+            campus: user.campus,
+            cycleDay: user.cycleDay,
+            cycleLength: user.cycleLength,
+            phase: user.phase,
+            nextPeriodInDays: user.nextPeriodInDays,
+          },
+        },
+      }
+    )
     setInput('')
   }
 
@@ -77,7 +92,11 @@ export function AssistantScreen() {
           </span>
           <div>
             <h1 className="text-base font-semibold leading-tight">PeriodLens</h1>
-            <p className="text-xs text-muted-foreground">AI health assistant</p>
+            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+              <span>Google Gemini AI</span>
+              <span>·</span>
+              <span className="text-primary font-medium">Day {user.cycleDay} ({user.phase})</span>
+            </p>
           </div>
         </div>
         <div role="radiogroup" aria-label="Response language" className="flex rounded-full bg-muted p-1 text-xs font-semibold">
