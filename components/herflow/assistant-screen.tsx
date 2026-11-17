@@ -204,9 +204,12 @@ export function AssistantScreen() {
         )}
 
         {error ? (
-          <p className="rounded-2xl bg-destructive/10 p-3 text-sm text-destructive" role="alert">
-            Something went wrong. Please try again.
-          </p>
+          <div className="rounded-2xl bg-destructive/10 p-4 text-xs text-destructive space-y-1.5" role="alert">
+            <p className="font-semibold text-sm">Something went wrong:</p>
+            <p className="font-mono text-xs break-all bg-card/60 p-2.5 rounded-xl border border-destructive/20">
+              {error.message || 'Please check your connection and try again.'}
+            </p>
+          </div>
         ) : null}
 
         <aside className="flex gap-3 rounded-2xl bg-rose-soft p-4 text-xs leading-relaxed text-rose-strong">

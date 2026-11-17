@@ -103,6 +103,10 @@ ${contextSnippet}
 Language Directive:
 ${languageInstruction}`
 
+    if (apiKey) {
+      process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey
+    }
+
     const google = createGoogleGenerativeAI({
       apiKey,
     })
@@ -113,6 +117,9 @@ ${languageInstruction}`
       model: google('gemini-1.5-flash'),
       system: fullSystemPrompt,
       messages: modelMessages,
+      onError({ error }) {
+        console.error('PeriodLens Gemini streaming error:', error)
+      },
     })
 
     if (typeof result.toUIMessageStreamResponse === 'function') {
