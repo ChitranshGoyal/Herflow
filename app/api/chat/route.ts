@@ -59,6 +59,9 @@ export async function POST(req: Request) {
       )
     }
 
+    // Ensure the SDK can read it even if the user set GEMINI_API_KEY in Vercel
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey
+
     // Build personalized system prompt
     let contextSnippet = ''
     if (userContext) {
@@ -84,8 +87,9 @@ export async function POST(req: Request) {
     }
 
     // Use the default google provider — reads GOOGLE_GENERATIVE_AI_API_KEY from env automatically
+    const modelName = process.env.GEMINI_MODEL?.trim() || 'gemini-3.5-flash-lite'
     const result = streamText({
-      model: google('gemini-2.5-flash-lite'),
+      model: google(modelName),
       system: systemPrompt,
       messages: modelMessages,
     })

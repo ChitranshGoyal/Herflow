@@ -173,9 +173,11 @@ export function AssistantScreen() {
                       : 'rounded-bl-lg border border-border bg-card',
                   )}
                 >
-                  {message.parts.map((part, i) =>
-                    part.type === 'text' ? <span key={`${message.id}-${i}`}>{part.text}</span> : null,
-                  )}
+                  {message.parts && message.parts.length > 0
+                    ? message.parts.map((part, i) =>
+                        part.type === 'text' ? <span key={`${message.id}-${i}`}>{part.text}</span> : null,
+                      )
+                    : (message as unknown as { content?: string }).content || null}
                 </div>
               </li>
             ))}
