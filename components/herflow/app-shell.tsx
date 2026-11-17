@@ -13,6 +13,7 @@ import { EmergencySheet } from './emergency-sheet'
 import { Onboarding } from './onboarding'
 import { helpers, type TabId } from '@/lib/herflow-data'
 import type { PadRequest } from '@/lib/request-types'
+import { submitPadRequest, updateRequestStatus } from '@/lib/supabase/services'
 
 export function AppShell() {
   const [tab, setTab] = useState<DesktopTabId>('home')
@@ -25,7 +26,13 @@ export function AppShell() {
   useEffect(() => {
     if (request?.status !== 'pending') return
     const timer = setTimeout(() => {
-      setRequest((r) => (r && r.status === 'pending' ? { ...r, status: 'accepted', helper: helpers[0] } : r))
+      setRequest((r) => {
+        if (r && r.status === 'pending') {
+          updateRequestStatus(r.id, 'accepted', helpers[0].alias)
+          return { ...r, status: 'accepted', helper: helpers[0] }
+        }
+        return r
+      })
     }, 3500)
     return () => clearTimeout(timer)
   }, [request?.status])
@@ -44,9 +51,21 @@ export function AppShell() {
   const requestHandlers = {
     request,
     onOpenSos: () => setSosOpen(true),
-    onCompleteRequest: () => setRequest((r) => (r ? { ...r, status: 'completed' } : r)),
-    onCancelRequest: () => setRequest(null),
+    onCompleteRequest: () => {
+      if (request) updateRequestStatus(request.id, 'completed')
+      setRequest((r) => (r ? { ...r, status: 'completed' } : r))
+    },
+    onCancelRequest: () => {
+      if (request) updateRequestStatus(request.id, 'cancelled')
+      setRequest(null)
+    },
     onDismissRequest: () => setRequest(null),
+  }
+
+  const handleSosSubmit = async (data: Omit<PadRequest, 'id' | 'status' | 'helper'>) => {
+    const newReq = await submitPadRequest(data)
+    setRequest(newReq)
+    setSosOpen(false)
   }
 
   // Active tab for mobile bottom nav (fallback to 'home' if 'about' was active on desktop)
@@ -157,10 +176,7 @@ export function AppShell() {
         <EmergencySheet
           open={sosOpen}
           onClose={closeSos}
-          onSubmit={(data) => {
-            setRequest({ ...data, id: crypto.randomUUID(), status: 'pending', helper: null })
-            setSosOpen(false)
-          }}
+          onSubmit={handleSosSubmit}
         />
       )}
 

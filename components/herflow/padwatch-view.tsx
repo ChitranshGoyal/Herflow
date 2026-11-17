@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { BellRing, Brain, Clock, LayoutDashboard, MapPin, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, SectionHeader, StockBadge, StockBar, Toggle } from './primitives'
-import { dispensers } from '@/lib/herflow-data'
+import { dispensers as defaultDispensers, type Dispenser } from '@/lib/herflow-data'
+import { fetchDispensers } from '@/lib/supabase/services'
 import { cn } from '@/lib/utils'
 
 const demand = [
@@ -26,12 +27,23 @@ function pinTone(stock: number) {
 }
 
 export function PadWatchView() {
-  const [selectedId, setSelectedId] = useState(dispensers[0].id)
+  const [dispensersList, setDispensersList] = useState<Dispenser[]>(defaultDispensers)
+  const [selectedId, setSelectedId] = useState(defaultDispensers[0].id)
   const [alerts, setAlerts] = useState(true)
   const [admin, setAdmin] = useState(false)
   const [refilled, setRefilled] = useState<string[]>([])
-  const selected = dispensers.find((d) => d.id === selectedId) ?? dispensers[0]
-  const low = dispensers.filter((d) => d.stock < 25)
+
+  useEffect(() => {
+    fetchDispensers().then((data) => {
+      if (data && data.length > 0) {
+        setDispensersList(data)
+        setSelectedId((prev) => (data.some((d) => d.id === prev) ? prev : data[0].id))
+      }
+    })
+  }, [])
+
+  const selected = dispensersList.find((d) => d.id === selectedId) ?? dispensersList[0]
+  const low = dispensersList.filter((d) => d.stock < 25)
 
   return (
     <div className="space-y-5">
@@ -48,7 +60,7 @@ export function PadWatchView() {
             className="scale-[1.18] object-cover"
             priority
           />
-          {dispensers.map((d) => {
+          {dispensersList.map((d) => {
             const isSelected = d.id === selectedId
             return (
               <button
@@ -111,9 +123,9 @@ export function PadWatchView() {
       </Card>
 
       <Card aria-labelledby="all-title">
-        <SectionHeader id="all-title" title="All dispensers" eyebrow={`${dispensers.length} on campus`} />
+        <SectionHeader id="all-title" title="All dispensers" eyebrow={`${dispensersList.length} on campus`} />
         <ul className="space-y-1">
-          {dispensers.map((d) => (
+          {dispensersList.map((d) => (
             <li key={d.id}>
               <button
                 type="button"
@@ -203,7 +215,7 @@ export function PadWatchView() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {dispensers.map((d) => {
+                {dispensersList.map((d) => {
                   const done = refilled.includes(d.id)
                   const stock = done ? 100 : d.stock
                   return (

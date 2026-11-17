@@ -7,6 +7,7 @@ import { Card, Chip, SectionHeader, StockBadge, StockBar } from './primitives'
 import { RequestStatusCard } from './request-status-card'
 import { dispensers, moods, symptoms, user, type TabId } from '@/lib/herflow-data'
 import type { PadRequest } from '@/lib/request-types'
+import { saveDailyCheckIn } from '@/lib/supabase/services'
 import { cn } from '@/lib/utils'
 
 export function HomeScreen({
@@ -190,7 +191,10 @@ function SymptomCheckIn() {
         ))}
       </div>
       <Button
-        onClick={() => setSaved(true)}
+        onClick={() => {
+          saveDailyCheckIn({ mood, symptoms: selected })
+          setSaved(true)
+        }}
         disabled={!mood && selected.length === 0}
         variant={saved ? 'secondary' : 'default'}
         className={cn('mt-5 h-12 w-full rounded-2xl font-semibold', saved && 'bg-sage-soft text-sage-strong')}

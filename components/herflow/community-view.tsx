@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Check, EyeOff, Gift, HandHelping, Inbox, MapPin, Plus, ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, Chip, Toggle } from './primitives'
 import { communityPosts, type CommunityPost } from '@/lib/herflow-data'
+import { fetchCommunityPosts, submitCommunityPost } from '@/lib/supabase/services'
 import { cn } from '@/lib/utils'
 
 type Filter = 'all' | 'request' | 'offer'
@@ -19,20 +20,22 @@ export function CommunityView() {
   const [location, setLocation] = useState('Central Library')
   const [anonymous, setAnonymous] = useState(true)
 
+  useEffect(() => {
+    fetchCommunityPosts().then((data) => {
+      if (data && data.length > 0) setPosts(data)
+    })
+  }, [])
+
   const visible = posts.filter((p) => filter === 'all' || p.kind === filter)
 
-  const publish = () => {
-    setPosts((prev) => [
-      {
-        id: `p-${prev.length + 1}`,
-        kind,
-        alias: anonymous ? 'Anonymous' : 'You',
-        location,
-        item,
-        time: 'Just now',
-      },
-      ...prev,
-    ])
+  const publish = async () => {
+    const newPost = await submitCommunityPost({
+      kind,
+      alias: anonymous ? 'Anonymous' : 'You',
+      location,
+      item,
+    })
+    setPosts((prev) => [newPost, ...prev])
     setComposing(false)
     setFilter('all')
   }
