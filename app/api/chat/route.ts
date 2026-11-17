@@ -85,7 +85,7 @@ export async function POST(req: Request) {
 
     // Use the default google provider — reads GOOGLE_GENERATIVE_AI_API_KEY from env automatically
     const result = streamText({
-      model: google('gemini-2.0-flash'),
+      model: google('gemini-3.8-flash'),
       system: systemPrompt,
       messages: modelMessages,
     })
